@@ -2,11 +2,11 @@ use std::cmp::{Ord, Ordering, PartialOrd};
 use std::collections::HashMap;
 use std::fs;
 
-fn parse(path: &str) -> Vec<Hand> {
+fn parse(path: &str, joker: bool) -> Vec<Hand> {
     let hands = fs::read_to_string(path)
         .expect("Should have been able to read the file")
         .lines()
-        .map(|l| Hand::new(l))
+        .map(|l| Hand::new(l, joker))
         .collect::<Vec<Hand>>();
     hands
 }
@@ -28,9 +28,18 @@ fn count_cards(cards: &str) -> HashMap<char, usize> {
 }
 
 fn get_hand_tier(cards: &str) -> u8 {
-    let count_map = count_cards(cards);
+    let mut count_map = count_cards(cards);
+    let num_jokers = match count_map.remove(&'0') {
+        Some(v) => v,
+        None => 0,
+    };
     let mut counts = count_map.values().cloned().collect::<Vec<usize>>();
-    counts.sort();
+    counts.sort_by(|a, b| b.cmp(a));
+    if counts.len() == 0 {
+        counts.push(num_jokers);
+    } else {
+        counts[0] += num_jokers;
+    }
 
     if counts.len() == 1 {
         6
@@ -49,12 +58,14 @@ fn get_hand_tier(cards: &str) -> u8 {
     }
 }
 
-// pub const CARD_MAP: HashMap<char, char> =
-//     HashMap::from([('A', 'E'), ('K', 'D'), ('Q', 'C'), ('J', 'B'), ('T', 'A')]);
-
-fn get_sortable_cards(cards: &str) -> String {
-    let card_map: HashMap<char, char> =
-        HashMap::from([('A', 'E'), ('K', 'D'), ('Q', 'C'), ('J', 'B'), ('T', 'A')]);
+fn get_sortable_cards(cards: &str, joker: bool) -> String {
+    let card_map: HashMap<char, char> = HashMap::from([
+        ('A', 'E'),
+        ('K', 'D'),
+        ('Q', 'C'),
+        ('J', if joker { '0' } else { 'B' }),
+        ('T', 'A'),
+    ]);
     let mut sortable_cards = String::new();
     for item in cards.chars() {
         let is_not_numeric = !item.is_numeric();
@@ -68,14 +79,14 @@ fn get_sortable_cards(cards: &str) -> String {
 }
 
 impl Hand {
-    fn new(l: &str) -> Self {
+    fn new(l: &str, joker: bool) -> Self {
         let (cards, bid) = l.trim().split_once(" ").unwrap();
-
+        let sortable_cards = get_sortable_cards(cards, joker);
         Self {
             cards: cards.to_string(),
             bid: bid.parse::<usize>().unwrap(),
-            tier: get_hand_tier(cards),
-            sortable_cards: get_sortable_cards(cards),
+            tier: get_hand_tier(&sortable_cards),
+            sortable_cards,
         }
     }
 }
@@ -102,18 +113,26 @@ impl PartialOrd for Hand {
 }
 
 fn pt1() {
-    let mut hands = parse("src/input.txt");
+    let mut hands = parse("src/input.txt", false);
     hands.sort();
-    // println!("{:?}", hands);
     let mut total = 0;
     for (idx, hand) in hands.iter().enumerate() {
         total += (idx + 1) * hand.bid;
-        println!("Hand: {:?}", hand);
+        // println!("Hand: {:?}", hand);
     }
     println!("\nTotal: {:?}", total);
 }
 
-fn pt2() {}
+fn pt2() {
+    let mut hands = parse("src/input.txt", true);
+    hands.sort();
+    let mut total = 0;
+    for (idx, hand) in hands.iter().enumerate() {
+        total += (idx + 1) * hand.bid;
+        // println!("Hand: {:?}", hand);
+    }
+    println!("\nTotal: {:?}", total);
+}
 
 fn main() {
     println!("\n=========\nPart 1:\n");
