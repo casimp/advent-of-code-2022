@@ -51,7 +51,6 @@ fn get_surrounds(grid: &Vec<Vec<char>>, current: (usize, usize)) -> Vec<Vec<char
 struct SearchPath {
     current_char: char,
     previous_char: char,
-    start: (usize, usize),
     current: (usize, usize),
     previous: (usize, usize),
     path: Vec<char>,
@@ -62,9 +61,8 @@ struct SearchPath {
 impl SearchPath {
     fn from_grid(grid: Vec<Vec<char>>) -> SearchPath {
         let grid = pad_grid(&grid);
-        let start = find_start(&grid);
-        let current = start;
-        let previous = start;
+        let current = find_start(&grid);
+        let previous = current;
         let path = vec![];
         let nodes = vec![];
         let current_char = 'S';
@@ -72,7 +70,6 @@ impl SearchPath {
         SearchPath {
             current_char,
             previous_char,
-            start,
             current,
             path,
             grid,
@@ -98,12 +95,6 @@ impl SearchPath {
                         && valid_north.contains(&self.current_char)
                         && (self.previous != (rindex, cindex))
                     {
-                        println!(
-                            "Found {:?} at {:?} | rel = {:?}",
-                            c,
-                            (rindex, cindex),
-                            (ridx, cidx)
-                        );
                         self.previous = self.current;
                         self.previous_char = self.current_char;
                         self.current = (rindex, cindex);
@@ -117,12 +108,6 @@ impl SearchPath {
                         && valid_east.contains(&self.current_char)
                         && (self.previous != (rindex, cindex))
                     {
-                        println!(
-                            "Found {:?} at {:?} | rel = {:?}",
-                            c,
-                            (rindex, cindex),
-                            (ridx, cidx)
-                        );
                         self.previous = self.current;
                         self.previous_char = self.current_char;
                         self.current = (rindex, cindex);
@@ -136,12 +121,6 @@ impl SearchPath {
                         && valid_west.contains(&self.current_char)
                         && (self.previous != (rindex, cindex))
                     {
-                        println!(
-                            "Found {:?} at {:?} | rel = {:?}",
-                            c,
-                            (rindex, cindex),
-                            (ridx, cidx)
-                        );
                         self.previous = self.current;
                         self.previous_char = self.current_char;
                         self.current = (rindex, cindex);
@@ -155,12 +134,6 @@ impl SearchPath {
                         && valid_south.contains(&self.current_char)
                         && (self.previous != (rindex, cindex))
                     {
-                        println!(
-                            "Found {:?} at {:?} | rel = {:?}",
-                            c,
-                            (rindex, cindex),
-                            (ridx, cidx)
-                        );
                         self.previous = self.current;
                         self.previous_char = self.current_char;
                         self.current = (rindex, cindex);
@@ -187,18 +160,6 @@ fn move_through_path(mut path: SearchPath) -> SearchPath {
     path
 }
 
-fn pt1() {
-    let path = parse("src/test.txt");
-    for l in &path.grid {
-        println!("{:?}", l);
-    }
-    move_through_path(path);
-}
-
-fn is_clockwise(path: &SearchPath) -> bool {
-    true
-}
-
 #[derive(PartialEq, Debug)]
 enum Direction {
     East,
@@ -223,71 +184,109 @@ fn get_direction(previous: (usize, usize), current: (usize, usize)) -> Direction
     }
 }
 
-fn pt2() {
-    let mut path = parse("src/test6.txt");
-    for l in &path.grid {
-        println!("{:?}", l);
+fn is_clockwise(nodes: &Vec<(usize, usize)>) -> bool {
+    let mut total = 0;
+    for idx in 1..nodes.len() {
+        let (y2, x2) = nodes[idx];
+        let (y1, x1) = nodes[idx - 1];
+        let edge = (x2 as isize - x1 as isize) * (y2 as isize + y1 as isize);
+        total += edge;
     }
+
+    total < 0
+}
+
+fn pt1() {
+    let path = parse("src/input.txt");
+    move_through_path(path);
+}
+
+fn pt2() {
+    let mut path = parse("src/input.txt");
     path = move_through_path(path);
-    println!("{:?}", path.current_char);
+
     let mut previous = path.nodes[0];
 
     let mut search_points: HashSet<(usize, usize)> = HashSet::new();
 
     let nodes_set: HashSet<(usize, usize)> = HashSet::from_iter(path.nodes.clone());
+
+    let path_is_clockwise = is_clockwise(&path.nodes);
+    if !path_is_clockwise {
+        path.nodes.reverse();
+        path.path.reverse();
+    }
+
+    // start by finding the seeds for flood fill. to do this we
+    // travel clockwise along the path and find any "seed" (searchable)
+    // points along the path
     for (idx, current) in path.nodes.iter().enumerate() {
         if idx == 0 {
             previous = *current;
             continue;
         }
         let direction = get_direction(previous, *current);
-        // let look_at = vec![];
-        let look_at;
-
-        // need to check for turning
+        let mut look_at = vec![];
 
         if direction == Direction::East {
             // look_south
-            look_at = (current.0 - 1, current.1);
+            look_at.push((current.0 + 1, current.1));
+            // if i am turning north
+            if path.path[idx] == 'J' {
+                look_at.push((current.0 + 1, current.1 + 1));
+                look_at.push((current.0, current.1 + 1));
+            }
             // path.grid
         } else if direction == Direction::West {
             // look_north
-            look_at = (current.0 + 1, current.1);
+            look_at.push((current.0 - 1, current.1));
+            // if i am turning south
+            if path.path[idx] == 'F' {
+                look_at.push((current.0 - 1, current.1 - 1));
+                look_at.push((current.0, current.1 - 1));
+            }
         } else if direction == Direction::North {
             // look_east
-            look_at = (current.0, current.1 - 1);
+            look_at.push((current.0, current.1 + 1));
+            // if i am turning west
+            if path.path[idx] == '7' {
+                look_at.push((current.0 - 1, current.1 + 1));
+                look_at.push((current.0 - 1, current.1));
+            }
         } else if direction == Direction::South {
             // look_west
-            look_at = (current.0, current.1 + 1);
+            look_at.push((current.0, current.1 - 1));
+            // if i am turning east
+            if path.path[idx] == 'L' {
+                look_at.push((current.0 + 1, current.1 - 1));
+                look_at.push((current.0 + 1, current.1));
+            }
         } else {
             panic!("Unknown direction")
         }
-        if !nodes_set.contains(&look_at) {
-            search_points.insert(look_at);
+        for la in look_at {
+            if !nodes_set.contains(&la) {
+                search_points.insert(la);
+            }
         }
 
-        println!(
-            "Heading {:?}: At {:?} ({:?}) Looking At {:?} == {}",
-            direction, path.nodes[idx], path.path[idx], look_at, path.grid[look_at.0][look_at.1]
-        );
         previous = *current;
     }
 
+    // once we have the seeds we then iteratively extend the seed points
+    // into adjacent, unfilled locations until we can extend no longer
     let mut flood_points = HashSet::new();
-    // let current_points = flood_points.
-    println!("{:?}", search_points);
+    println!("Number of seeds: {:?}", search_points.len());
     while flood_points != search_points {
         for p in &flood_points {
             search_points.insert(*p);
         }
         for s in &search_points {
             flood_points.insert(*s);
-            // println!("{:?}", s);
             let surrounds = get_surrounds(&path.grid, *s);
-            // println!("{:?}", surrounds);
             for (ridx, row) in surrounds.iter().enumerate() {
                 let rindex = ridx + s.0 - 1;
-                for (cidx, c) in row.iter().enumerate() {
+                for (cidx, _c) in row.iter().enumerate() {
                     let cindex = cidx + s.1 - 1;
                     if !nodes_set.contains(&(rindex, cindex)) {
                         flood_points.insert((rindex, cindex));
@@ -295,14 +294,8 @@ fn pt2() {
                 }
             }
         }
-        println!("{:?}", flood_points.len());
+        println!("Flooded number of points: {:?}", flood_points.len());
     }
-
-    // println!("{:?}", search_points);
-    // for p in &flood_points {
-    //     println!("{:?}", (p.0 - 1, p.1 - 1));
-    // }
-    // println!("{:?}", search_points.len());
 }
 
 fn main() {
